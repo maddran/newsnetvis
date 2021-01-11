@@ -20,7 +20,7 @@ def network_plots(files, include=None, exclude=None, group=None):
 
     G = nx.DiGraph()
     if not group:
-        G = nx.from_pandas_edgelist(grouped, "from_index", "to_index", "count")
+        G = nx.from_pandas_edgelist(data, "from_index", "to_index", "count")
         pos = get_pos(G)
 
         nodes = [dict(
