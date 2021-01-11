@@ -1,0 +1,5 @@
+*.png
+*.ipynb
+.vscode
+.ipynb_checkpoints
+*pycache*
