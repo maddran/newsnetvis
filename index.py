@@ -4,7 +4,7 @@ import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
 
-from app import app
+from app import app, server
 from upload_tab import upload_tab_content
 from summary_tab import summary_tab_content
 from network_tab import network_tab_content
