@@ -1,4 +1,3 @@
-
 import pandas as pd
 import numpy as np
 from datetime import timedelta
@@ -59,28 +58,29 @@ def get_full_data(files, include=None, exclude=None, from_to_flag = False):
                         left_on='from_index', right_index=True, how='left')
 
     if include and any(include):
-        to_include = {cols[i]:v for i, v in enumerate(include) if v != None}
-        if from_to_flag:
-            from_dict = {f"from_{c}": v for c, v in to_include.items()}
-            to_dict = {f"to_{c}": v for c, v in to_include.items()}
-            from_dict.update(to_dict)
-            to_include = from_dict
+        to_include = {cols[i]:v for i, v in enumerate(include) if v and len(v)!=0}
+        
 
-        submerged = []
         for col, values in to_include.items():
-            submerged.append(merged[merged.loc[:,col].isin(values)])
+            if from_to_flag:
+                col = [pre+col for pre in ['from_', 'to_']]
+            else:
+                col = [col]
 
-        merged = pd.concat(submerged).drop_duplicates()
+            if len(to_include)==1:
+                for c in col:
+                    merged = merged[merged.loc[:, c].isin(values)]
+            else:
+                submerged = []
+                print(to_include)
+                for c in col:
+                    submerged.append(merged[merged.loc[:, c].isin(values)])
+
+                merged = pd.concat(submerged).drop_duplicates()
 
     if exclude and any(exclude):
-        to_exclude = {cols[i]: v for i, v in enumerate(exclude) if v != None}
-        # print("Exclude :", exclude, to_exclude)
-        # if from_to_flag:
-        #     from_dict = {f"from_{c}": v for c, v in to_exclude.items()}
-        #     to_dict = {f"to_{c}": v for c, v in to_exclude.items()}
-        #     from_dict.update(to_dict)
-        #     to_exclude = from_dict
-        submerged = []
+        to_exclude = {cols[i]: v for i, v in enumerate(exclude) if v and len(v)!=0}
+
         for col, values in to_exclude.items():
             if from_to_flag:
                 col = [pre+col for pre in ['from_', 'to_']]
@@ -90,17 +90,14 @@ def get_full_data(files, include=None, exclude=None, from_to_flag = False):
             for c in col:
                 merged = merged[~merged.loc[:, c].isin(values)]
 
-            # submerged.append(merged[~merged.loc[:, col].isin(values)])
-
-        # merged = pd.concat(submerged)
-        # merged = merged[merged.duplicated(keep='first')]
-
     return merged
     
 
 def summary_figs(files, include, exclude):
 
-    merged = get_full_data(files, include, exclude)
+    merged = get_full_data(files, include, exclude, True)
+    n_sources = len(set(list(merged['from_index'].values)+
+                        list(merged['to_index'].values)))
 
     if merged.empty:
         return None
@@ -108,61 +105,63 @@ def summary_figs(files, include, exclude):
     figs = []
 
     cols = ['category', 'region', 'country', 'lang']
-    grouped = merged.copy().groupby(cols, dropna=False).agg({'count': 'sum'}).reset_index()
 
-    data = grouped.sort_values(['count','country'], ascending=[0,1]).to_dict('records')
-    columns = [{"name": i, "id": i, } for i in (grouped.columns)]
-    
-    summary_table = dt.DataTable(
-                        data=data, 
-                        columns=columns,
-                        filter_action="native",
-                        sort_action="native",
-                        row_selectable="multi",
-                        selected_rows=[],
-                        style_table={
-                            'height': '500px',
-                            'overflowY': 'auto',
-                            'overflowX': 'auto',
-                            'maxWidth': '100%'
-                        }, 
-                        style_as_list_view=True,
-                        style_cell={
-                            'padding': '5px',
-                            'whiteSpace': 'normal',
-                            'height': 'auto',
-                            },
-                        style_header={
-                                'backgroundColor': 'white',
-                                'fontWeight': 'bold'
-                        })
+    for prefix in ['from_', 'to_']:
+        group_cols = [f'{prefix}{col}' for col in cols]
+        grouped = merged.copy().groupby(group_cols, dropna=False).agg({'count': 'sum'}).reset_index()
 
-    figs += [summary_table] + daily_articles(merged)
+        data = grouped.sort_values(['count', f'{prefix}country'], ascending=[0,1]).head(20).to_dict('records')
+        columns = [{"name": i.split('_')[-1].upper(), "id": i, } for i in grouped.columns]
+        
+        summary_table = dt.DataTable(
+                            data=data, 
+                            columns=columns,
+                            filter_action="native",
+                            sort_action="native",
+                            style_table={
+                                # 'height': '500px',
+                                'overflowY': 'auto',
+                                'overflowX': 'auto',
+                                'maxWidth': '95%'
+                            }, 
+                            style_as_list_view=True,
+                            style_cell={
+                                'padding': '5px',
+                                'whiteSpace': 'normal',
+                                'height': 'auto',
+                                },
+                            style_header={
+                                    'backgroundColor': 'white',
+                                    'fontWeight': 'bold'
+                            })
+
+        figs += [summary_table]
+
+    figs += daily_articles(merged) + [n_sources]
 
     return figs
 
 
 def daily_articles(grouped):
 
-    cols = ['region', 'lang', 'country']
+    figs = []
+
+    cols = ['from_region', 'from_lang', 'from_country']
     grouped = grouped.groupby(["parsed_date", "from_index"]+cols, 
                                 dropna=False).agg({'count': 'sum'}).reset_index()
 
-    by_day = grouped.groupby('parsed_date')['count'].sum()
+    try:
+        by_day = grouped.groupby('parsed_date')['count'].sum()
 
-    # grouped = pd.merge(grouped, by_day, on='parsed_date', how='left', suffixes=['', '_norm'])
-    # grouped['count_norm'] = grouped['count']*100/grouped['count_norm']
-    # max_count = grouped.groupby('from_index').sum()['count'].nlargest()
-    # print(max_count)
-    # print(sources_df.iloc[max_count.index,:])
-
-    by_day_prop = by_day.cumsum()/sum(by_day)
-    mid_date = by_day_prop[by_day_prop <= 0.5].idxmax()
+        by_day_prop = by_day.cumsum()/sum(by_day)
+        mid_date = by_day_prop[by_day_prop <= 0.5].idxmax()
+  
+    except:
+        mid_date = by_day_prop.index[0]
 
     lower_date = mid_date - timedelta(days=7)
-    upper_date = mid_date + timedelta(days=7)  
+    upper_date = mid_date + timedelta(days=7)
 
-    figs = []
 
     for _, col in enumerate(cols):
         by_group = (grouped[grouped['parsed_date'].notna()]
@@ -180,26 +179,28 @@ def daily_articles(grouped):
             if len(name) > 15:
                 formatted_name = name[0:15]+'...'
             else:
-                formatted_name = name.ljust(15)
+                formatted_name = name#.ljust(15)
             areas[ordered_col[name]] = (go.Scatter(name=formatted_name, x=group['parsed_date'], y=group['count'],
                                             mode='lines', stackgroup='one',  hoveron='points'))
        
-        title_dict = dict(region = 'Region', lang='Language', country='Country')
-        titletext = f"Daily Article Count by {title_dict[col]}"
 
         fig = go.Figure(data=areas)
         fig.update_xaxes(rangeslider_visible=True)
         fig.update_layout(
             template='simple_white',
-            showlegend=True,
-            # title=titletext,
+            # width=700,
             xaxis = dict(
                 type='date',
                 range=[lower_date, upper_date]),
             yaxis=dict(
                 type='linear',
                 ticksuffix=''),
-            margin=dict(pad=5, b=0))
+            legend=dict(
+                yanchor = 'top',
+                xanchor = 'left',
+                y = 1, x = 1.05),
+            showlegend = True,
+            margin=dict(pad=0, t=30, b=0))
         
         figs.append(fig)
         # fig.show()

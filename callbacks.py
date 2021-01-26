@@ -79,7 +79,11 @@ def output_preview(list_of_contents, sep_btn, nov_btn, list_of_names, list_of_da
 
     return children, disable_continue, outline_continue, data_status, fpaths
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Rediect to tab~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Redirect to tab~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+network_buttons = [f"{cat}-net-btn" for cat in 
+                    ['region', 'country', 'language', 'source']]
 
 summary_tab_ouputs = [Output('summary-tab', 'disabled')]
                                                 
@@ -92,15 +96,21 @@ tab_change_outputs = (summary_tab_ouputs + network_tab_ouputs +
 @app.callback(
                 tab_change_outputs,
 
-                Input('data-continue-btn', 'n_clicks'),
-                Input('gen-net-btn', 'n_clicks'),
+                [Input('data-continue-btn', 'n_clicks')]+
+                [Input(btn, 'n_clicks') for btn in network_buttons],
                 
                 State('paths-store', 'data'),
                 State('filter-selections', 'data'),
 
                 prevent_initial_call = True
              )
-def on_tab_change(n_continue, n_network, paths, filters):
+def on_tab_change(n_continue, 
+                    n_region,
+                    n_country,
+                    n_language,
+                    n_source, 
+                    paths, 
+                    filters):
     changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
     res = [no_update]*len(tab_change_outputs)
 
@@ -111,14 +121,21 @@ def on_tab_change(n_continue, n_network, paths, filters):
             res[0] = False
             res[-1] = 'summary-tab'
 
-    elif 'gen-net-btn' in changed_id:
-        if n_network is None:
+    elif any([btn in changed_id for btn in network_buttons]):
+        if all([n_clicks is None for n_clicks in 
+                    [n_region,
+                    n_country,
+                    n_language,
+                    n_source]
+                    ]):
             raise PreventUpdate
         else: 
             res[1] = False
-            res[2] = "DO IT"
+            res[2] = changed_id.split('-')[0]
             res[-1] = 'network-tab'
     
+    print(res[2])
+
     return tuple(res)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Populate filters~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -196,10 +213,15 @@ def reset_filter_values(n):
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Generate Summary Figures~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
+
+                
 @app.callback(
-    [Output('summary-table', 'children')]+
+    [Output('from-table', 'children'),
+     Output('to-table', 'children')] +
     [Output(f"by-{col}-plot", 'children') 
-        for col in ['region', 'country', 'language']],
+        for col in ['region', 'language', 'country']]+
+    [Output('source-net-btn', 'disabled'),
+     Output('disabled-warning', 'children')],
 
     Input('paths-store', 'data'),
     Input('filter-selections', 'data'),
@@ -216,20 +238,34 @@ def generate_summary_figs(paths, filter):
         include = values[:len(values)//2]
         exclude = values[len(values)//2:]  
 
-        # print(values)
+        disable_source=True
 
         figs = summary_figs(paths, include, exclude)
+
         if not figs:
-            table = dbc.Alert("""Filter selection returned and empty query! 
+            tables = [dbc.Alert("""Filter selection returned and empty query! 
                                 Please review your selection, or click Reset Filters 
                                 to revert to defaults""",
-                            color = 'danger')
+                            color = 'danger'), '']
             figs = ['']*3
         else:
-            table = figs.pop(0)
-            figs = [dcc.Graph(figure=fig) for fig in figs]
+            tables = figs[0:2]
+            n_sources = figs.pop(-1)
+            print(f"Num sources = {n_sources}")
+            if n_sources <= 1000:
+                disable_source = False
+            figs = [dcc.Graph(figure=fig) for fig in figs[2:]]
         
-        res = [table] + figs
+        if disable_source:
+            warning = dbc.Alert("N.B. 'Generate Source Network' has been disabled becasue "
+                                "the graph would be too large to plot stably. "
+                                "Please consider filtering the dataset.", 
+                                color="dark")
+        else:
+            warning = ''
+
+        res = tables + figs + [disable_source, warning]
+        
     
     return tuple(res)
 
@@ -257,7 +293,7 @@ def toggle_filters(n, is_open):
     State('paths-store', 'data'),
     
 )
-def generate_network_figs(_, filters, paths):
+def generate_network_figs(trigger, filters, paths):
     if not paths:
         raise PreventUpdate
     else:
@@ -266,13 +302,12 @@ def generate_network_figs(_, filters, paths):
         else:
             values = filters
 
-        # print(f"Triggered network_plot with: {values}")
-
         include = values[:len(values)//2]
         exclude = values[len(values)//2:]
 
+        group_map = dict(region='region', country='country', language='lang', source=None)
         fig = network_plots(paths, include=include, exclude=exclude,
-                            group='country')
+                            group=group_map[trigger])
 
         return fig
 

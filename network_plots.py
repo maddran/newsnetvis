@@ -1,6 +1,6 @@
 import networkx as nx
 from networkx.readwrite import json_graph
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt 
 import dash_cytoscape as cyto
 
 import pandas as pd
@@ -9,132 +9,137 @@ from datetime import timedelta
 
 from summary_plots import get_full_data, load_files
 
+def sum_dicts(x,y,sub=0):
+    return {k: x.get(k, 0) + (-1*sub)*y.get(k, 0) for k in set(x) | set(y)}
+
+def node_size_col(G):
+    in_degree = dict(G.in_degree(weight='count'))
+    out_degree = dict(G.out_degree(weight='count'))
+
+    total_degree = sum_dicts(in_degree, out_degree)
+    net_degree = sum_dicts(in_degree, out_degree, 1)
+
+    return total_degree, net_degree
 
 def network_plots(files, include=None, exclude=None, group=None):
 
     _, sources_df = load_files(files)
     data = get_full_data(files, include=include, exclude=exclude, from_to_flag=True)
 
-    # grouped = data.groupby(["from_index", "to_index"],
-    #                           dropna=False).agg({'count': 'sum'}).reset_index()
-
-    G = nx.DiGraph()
     if not group:
-        G = nx.from_pandas_edgelist(data, "from_index", "to_index", "count")
-        pos = get_pos(G)
+        cols = ["from_index", "to_index"]
+        grouped = data.groupby(cols, dropna=False).agg({'count': 'sum'}).reset_index()
+
+        G = nx.from_pandas_edgelist(grouped, cols[0], cols[1], "count",
+                                    create_using=nx.DiGraph())
+
+        total_degree, net_degree = node_size_col(G)
 
         nodes = [dict(
-                    data=dict(id=str(n), label=sources_df.loc[n, 'name']),
-                    position=dict(x=pos[n][0], y=pos[n][1])
-                ) for n in G.nodes]
+                    data=dict(id=str(n), label=sources_df.loc[n, 'text'], 
+                                size=total_degree[int(n)],
+                                color=net_degree[int(n)]), 
+                    selectable=True,
+                    )
+                for n in G.nodes]
+
 
     else:
         cols = sorted([col for col in data.columns if group in col])
 
-        # for idx in ['from_index', 'to_index']:
-        #     grouped = pd.merge(grouped, sources_df.loc[:, ['country']],
-        #                     left_on=idx, right_index=True, how='left')
-        #     grouped = grouped.rename(columns = {'country':f"{idx.split('_')[0]}_country"})
-
         grouped = data.groupby(cols, dropna=False).agg({'count': 'sum'}).reset_index()
 
-        print("from", sorted(list(set(grouped[cols[0]]))))
-        print("to", sorted(list(set(grouped[cols[1]]))))
+        G = nx.from_pandas_edgelist(grouped, cols[0], cols[1], "count",
+                                    create_using=nx.DiGraph())
 
-        G = nx.from_pandas_edgelist(grouped, cols[0], cols[1], "count")
-        pos = get_pos(G)
+        total_degree, net_degree = node_size_col(G)
 
         nodes = [dict(
-                    data=dict(id=str(n), label=str(n)),
-                    position=dict(x=pos[n][0], y=pos[n][1])
-                ) for n in G.nodes]
+                    data=dict(id=str(n), label=str(n),
+                              size=total_degree[n],
+                              color=net_degree[n]),
+                    selectable=True,
+                    )
+                for n in G.nodes]
 
+    
 
     edges = [dict(
-                data=dict(source=str(e[0]), target=str(e[1]), label='')
-            ) for e in G.edges]
+                data=dict(source=str(e[0]), target=str(e[1]), 
+                label='', count=e[2]['count'])
+            ) for e in G.edges.data()]
+
+    # print(edges)
 
     elements = nodes + edges
 
     network = cyto.Cytoscape(
-                    id='cytoscape-layout-1',
+                    id='network-layout',
                     elements=elements,
                     style={'width': '100%', 'height': '800px'},
                     layout={
-                        'name': 'preset',
-                        'fit' : False,
-                        'animate' : False
+                        'name': 'cose',
+                        'fit' : True,
+                        'animate' : False,
+                        'gravity' : 10,
+                        'nodeOverlap' : 5e5,
+                        'nodeRepulsion' : 1e6,
                     },
                     stylesheet = gen_stylesheet(G)
                 )
 
     return network
 
-def scale(pos):
-    keys, values = zip(*pos.items())
-    x, y = zip(*values)
-
-    # x*=100
-    # y*=100
-
-    scale = max(max(x)-min(x), max(y)-min(y))
-
-    normed_x = x/scale
-    normed_x = (normed_x - min(normed_x))*2000
-    # normed_x /= 
-
-    normed_y = y/scale
-    normed_y = (normed_y - min(normed_y))*2000
-
-    # min(normed_x)
-    # normed_x += 500
-    # normed_y += 300
-
-    print(np.median(normed_x), np.median(normed_y))
-
-    normed = list(zip(normed_x, normed_y))
-
-    return dict(zip(keys, normed))
-
-def get_pos(G):
-    pos = nx.spring_layout(G)
-    pos = scale(pos)
-    return pos
-
 def gen_stylesheet(G, selected_node = None):
-    edge_color = 'rgb(70, 70, 70)'
-    edge_opacity = '0.2'
+    target_edge_color = 'rgb(0, 150, 200)'
+    source_edge_color = 'rgb(200, 0, 0)'
+    edge_opacity = '0.5'
 
-    edge_color_selected = 'rgb(70, 70, 70)'
-    edge_opacity_selected = '0.8'
+    edge_color_faded = 'rgb(70, 70, 70)'
+    edge_opacity_faded = '0.8'
 
-    node_color = 'rgb(0, 57, 107)'
-    node_opacity = '0.8'
+    node_color = 'rgb(0, 100, 150)'
+    node_opacity = '0.7'
 
     node_color_selected = 'rgb(200, 90, 40)'
     node_opacity_faded = '0.2'
+    
+    total_degree, net_degree = node_size_col(G)
+    max_size = max(total_degree.values())
+    min_size = min(total_degree.values())
 
-    # if selected_node:
+    max_col = max(net_degree.values())
+    min_col = min(net_degree.values())
 
+    mapcolor = (f"mapData(color," 
+                f"{min_col}, {max_col}," 
+                f"{source_edge_color}, {target_edge_color})")
+    mapsize = f"mapData(size, {min_size}, {max_size}, 20, 100)"
 
     ss = [
             {
                 'selector': 'edge',
                 'style': {
-                    'mid-source-arrow-color': edge_color,
-                    'mid-source-arrow-shape': 'triangle',
-                    'mid-source-arrow-fill': 'filled',
-                    'line-color': edge_color,
-                    'opacity' : edge_opacity
+                    'mid-target-arrow-color': source_edge_color,
+                    'mid-target-arrow-shape': 'triangle',
+                    'mid-target-arrow-fill': 'filled',
+
+                    'curve-style': 'bezier',
+                    'line-fill' : 'linear-gradient',
+                    'line-gradient-stop-colors': [source_edge_color, target_edge_color],
+                    'opacity' : edge_opacity,
+                    'control-point-distances' : np.random.randint(low=-200, high=200, size=len(G.edges))
                 }
             },
 
             {
                 'selector': 'node',
                 'style': {
-                    'background-color': node_color,
+                    'background-color': mapcolor,
                     'opacity':node_opacity,
-                    'content': 'data(label)'
+                    'content': 'data(label)',
+                    "width": mapsize,
+                    "height": mapsize
                 }
             }
         ]

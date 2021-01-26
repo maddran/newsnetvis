@@ -24,12 +24,17 @@ filter_card = dbc.Card([
                                         f"Show/Hide Filters",
                                         color='secondary',
                                         id=f"filter-toggle",
-                                        style={"margin": "10px"}),
+                                        className="mr-1"),
                                     dbc.Button(
                                         f"Reset Filters",
                                         color='primary',
                                         id=f"filter-reset",
-                                        style={"margin":"10px", "marginLeft":"0px"}),
+                                        className="mr-1"),
+                                    dbc.Button(
+                                        "Apply Filters", 
+                                        color='primary', 
+                                        id="apply-filters-btn",
+                                        className="mr-1")
                                 ])
                             ),
                     dbc.Collapse(
@@ -53,7 +58,21 @@ daily_plot_tabs = dbc.Tabs(
                 label=f"Daily Article Count by {col.capitalize()}", 
                 tab_id=f"by-{col}-tab") 
         for col in ['region', 'language', 'country']
-    ], style={'width':'100%', 'fontSize':14})
+    ], style={'width':'100%', 'fontSize':14, 'height':'50%'})
+
+cats = ['region', 'country', 'language', 'source']
+disabled = dict(zip(cats, [False, False, False, True]))
+network_buttons = []
+for cat in cats:
+    button = dbc.Button(f"Generate {cat} Network",
+                        color='primary',
+                        id=f"{cat}-net-btn",
+                        block=True,
+                        disabled=disabled[cat],
+                        className="mb-1")
+
+    network_buttons.append(html.Div(button))
+network_buttons.append(html.Div(id='disabled-warning'))
 
 summary_tab_content = html.Div(
     [
@@ -68,32 +87,7 @@ summary_tab_content = html.Div(
 
                 filter_card,
 
-                dbc.Row([
-                    dbc.Col(dbc.Button("Apply Filters", color='primary', id="apply-filters-btn",
-                                    block=True, outline=False, disabled=False), width = 6),
-                         
-                    dbc.Col(dbc.Button("Generate Network", color='primary', id="gen-net-btn",
-                                    block=True, outline=False, disabled=False), width = 6)
-                        ]),
-
-                dbc.Row(
-                    [
-                        dbc.Col(
-                            [ 
-                                html.H5("Summary Table"),
-                                dbc.Spinner([
-                                    html.Div(id='summary-table', style={'height':"300px"})
-                                ])
-                            ], width=6),
-                        dbc.Col(
-                            [
-                                html.H5("Drill-down Table"),
-                                dbc.Spinner([
-                                   html.Div(id='drill=table', style={'height':"300px"}) 
-                                ])
-                            ], width=6),
-                    ], style={'marginTop':'20px'}
-                ),
+    
                 dbc.Row(
                     [
                         dbc.Col(
@@ -101,10 +95,30 @@ summary_tab_content = html.Div(
                                 dbc.Spinner([
                                     daily_plot_tabs,
                                 ]
-                                    )
-                            ], width=12),
-                    ], style=dict(marginTop=10)
-                )  
+                                )
+                            ], width=8),
+                        dbc.Col(network_buttons, width=4),
+                    ], align="center", style=dict(marginTop=10)
+                ),
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            [ 
+                                html.H5("Top 20 by Article Count"),
+                                dbc.Spinner([
+                                    html.Div(id='from-table', style={'height':"300px"})
+                                ])
+                            ], width=6),
+                        dbc.Col(
+                            [
+                                html.H5("Top 20 by Incoming Links"),
+                                dbc.Spinner([
+                                   html.Div(id='to-table', style={'height':"300px"}) 
+                                ])
+                            ], width=6),
+                    ], style={'marginTop': '20px', 'marginBottom': '20px'}
+                ),
+                
             ]), style={'height': '2000px'}
         )
     ],
