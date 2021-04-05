@@ -6,13 +6,11 @@ import dash_core_components as dcc
 import dash_html_components as html
 import dash_cytoscape as cyto
 
-from app import app
+from app import app, server
 from upload_tab import upload_tab_content
 from summary_tab import summary_tab_content
 from network_tab import network_tab_content
 import callbacks
-
-cyto.load_extra_layouts()
 
 data_tab_content = dbc.Card(
     dbc.CardBody(
@@ -41,15 +39,15 @@ app.layout = dbc.Container([
                           )
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--demo", dest='demo', action='store_true')
-    parser.set_defaults(demo=False)
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--demo", dest='demo', action='store_true')
+    # parser.set_defaults(demo=False)
 
-    args = parser.parse_args()
+    # args = parser.parse_args()
 
-    if args.demo:
-        print('Starting Inline')
-        app.run_server(mode='external')
-    else:
-        app.run_server(debug=True)
+    # if args.demo:
+    #     print('Starting Inline')
+    #     app.run_server(mode='external')
+    # else:
+    app.run_server(debug=True)
         
