@@ -42,7 +42,7 @@ app.layout = dbc.Container([
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--demo", dest=demo, action='store_true')
+    parser.add_argument("--demo", dest='demo', action='store_true')
     parser.set_defaults(demo=False)
 
     args = parser.parse_args()
