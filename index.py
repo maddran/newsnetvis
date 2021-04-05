@@ -6,7 +6,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 import dash_cytoscape as cyto
 
-from app import app, server
+from app import app
 from upload_tab import upload_tab_content
 from summary_tab import summary_tab_content
 from network_tab import network_tab_content

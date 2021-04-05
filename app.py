@@ -9,5 +9,5 @@ cyto.load_extra_layouts()
 # app = dash.Dash(external_stylesheets=[dbc.themes.LUMEN])
 app = JupyterDash(external_stylesheets=[dbc.themes.LUMEN])
 
-server = app.server
-server.secret_key = os.environ.get('secret_key', 'secret')
+# server = app.server
+# server.secret_key = os.environ.get('secret_key', 'secret')
