@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     if args.demo:
         print('Starting Inline')
-        app.run_server(mode='inline')
+        app.run_server(mode='inline', debug=False)
     else:
         app.run_server(debug=True)
         
