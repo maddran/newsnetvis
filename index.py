@@ -1,3 +1,4 @@
+import argparse
 import dash
 from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
@@ -40,4 +41,13 @@ app.layout = dbc.Container([
                           )
 
 if __name__ == "__main__":
-    app.run_server(debug=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--demo", dest=demo, action='store_true')
+    parser.set_defaults(demo=False)
+
+    args = parser.parse_args()
+
+    if not demo:
+        app.run_server(debug=True)
+    else:
+        app.run_server(mode='inline')
