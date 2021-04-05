@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if not demo:
+    if not args.demo:
         app.run_server(debug=True)
     else:
         app.run_server(mode='inline')
