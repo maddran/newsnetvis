@@ -3,7 +3,7 @@ import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
 
-filter_cols = ['category', 'region', 'country', 'language']
+filter_cols = ['category', 'region', 'country', 'language', 'topic']
 
 include_dropdowns = [dbc.Col(dcc.Dropdown(options=[], 
                                             multi=True, 
@@ -76,7 +76,6 @@ network_buttons.append(html.Div(id='disabled-warning'))
 
 summary_tab_content = html.Div(
     [
-        dcc.Store(id="edges-store"),
         dcc.Store(id="filter-selections"),
         dbc.Card(
             dbc.CardBody([

@@ -20,14 +20,17 @@ def load_files(files):
 
 def get_filter_options(files, selections=None):
     summary = get_full_data(files)
-    cols = ['category', 'region', 'country', 'lang']
+    cols = ['category', 'region', 'country', 'lang', 'topic1']
     options = {}
     for col in cols:
         res = sorted(list(set(summary.loc[:, col]
                                 .dropna(axis=0).values)))
         options[col] = [dict(label = r, value = r) for r in res]
 
+        
+
     options['language'] = options.pop('lang')
+    options['topic'] = options.pop('topic1')
     include_options = exclude_options = options
 
     if selections:

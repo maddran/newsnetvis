@@ -16,12 +16,21 @@ def node_size_col(G):
     in_degree = dict(G.in_degree(weight='count'))
     out_degree = dict(G.out_degree(weight='count'))
 
-    total_degree = sum_dicts(in_degree, out_degree)
+    selfloops = list(nx.selfloop_edges(G, data=True))
+    selfloops = dict([(l[0], 2*l[2]['count']) for l in selfloops])
+
+    total_degree = sum_dicts(dict(G.degree(weight='count')), selfloops, 1)
     net_degree = sum_dicts(in_degree, out_degree, 1)
 
-    return total_degree, net_degree
+    max_size = max(total_degree.values())
+    min_size = min(total_degree.values())
 
-def network_plots(files, include=None, exclude=None, group=None):
+    max_col = max(net_degree.values())
+    min_col = min(net_degree.values())
+
+    return total_degree, net_degree, max_size, min_size, max_col, min_col
+
+def network_data(files, include=None, exclude=None, group=None):
 
     _, sources_df = load_files(files)
     data = get_full_data(files, include=include, exclude=exclude, from_to_flag=True)
@@ -33,7 +42,7 @@ def network_plots(files, include=None, exclude=None, group=None):
         G = nx.from_pandas_edgelist(grouped, cols[0], cols[1], "count",
                                     create_using=nx.DiGraph())
 
-        total_degree, net_degree = node_size_col(G)
+        total_degree, net_degree, max_size, min_size, max_col, min_col = node_size_col(G)
 
         nodes = [dict(
                     data=dict(id=str(n), label=sources_df.loc[n, 'text'], 
@@ -52,7 +61,7 @@ def network_plots(files, include=None, exclude=None, group=None):
         G = nx.from_pandas_edgelist(grouped, cols[0], cols[1], "count",
                                     create_using=nx.DiGraph())
 
-        total_degree, net_degree = node_size_col(G)
+        total_degree, net_degree, max_size, min_size, max_col, min_col = node_size_col(G)
 
         nodes = [dict(
                     data=dict(id=str(n), label=str(n),
@@ -69,28 +78,34 @@ def network_plots(files, include=None, exclude=None, group=None):
                 label='', count=e[2]['count'])
             ) for e in G.edges.data()]
 
-    # print(edges)
+    sizecol = dict(min_col=min_col, max_col=max_col, 
+                    min_size=min_size, max_size=max_size)
 
+    G_dict = nx.to_dict_of_dicts(G)
+
+    return nodes, edges, sizecol, G_dict
+
+def gen_network(nodes, edges, sizecol, layout = 'concentric'):
     elements = nodes + edges
-
     network = cyto.Cytoscape(
-                    id='network-layout',
-                    elements=elements,
-                    style={'width': '100%', 'height': '800px'},
-                    layout={
-                        'name': 'cose',
-                        'fit' : True,
-                        'animate' : False,
-                        'gravity' : 10,
-                        'nodeOverlap' : 5e5,
-                        'nodeRepulsion' : 1e6,
-                    },
-                    stylesheet = gen_stylesheet(G)
-                )
+                id='network-layout',
+                elements=elements,
+                style={'width': '100%', 'height': '800px'},
+                layout={
+                    'name': layout,
+                    'fit': True,
+                    'animate': False,
+                    'gravity': 10,
+                    'nodeOverlap': 5e5,
+                    'nodeRepulsion': 1e6,
+                },
+                stylesheet=gen_stylesheet(sizecol)
+            )
 
     return network
 
-def gen_stylesheet(G, selected_node = None):
+def gen_stylesheet(sizecol, to_fade=None):
+
     target_edge_color = 'rgb(0, 150, 200)'
     source_edge_color = 'rgb(200, 0, 0)'
     edge_opacity = '0.5'
@@ -104,17 +119,16 @@ def gen_stylesheet(G, selected_node = None):
     node_color_selected = 'rgb(200, 90, 40)'
     node_opacity_faded = '0.2'
     
-    total_degree, net_degree = node_size_col(G)
-    max_size = max(total_degree.values())
-    min_size = min(total_degree.values())
+    min_col = sizecol['min_col']
+    max_col = sizecol['max_col']
 
-    max_col = max(net_degree.values())
-    min_col = min(net_degree.values())
+    min_size = sizecol['min_size']
+    max_size = sizecol['max_size']
 
     mapcolor = (f"mapData(color," 
                 f"{min_col}, {max_col}," 
                 f"{source_edge_color}, {target_edge_color})")
-    mapsize = f"mapData(size, {min_size}, {max_size}, 20, 100)"
+    mapsize = f"mapData(size, {min_size}, {max_size}, 10, 60)"
 
     ss = [
             {
@@ -128,7 +142,7 @@ def gen_stylesheet(G, selected_node = None):
                     'line-fill' : 'linear-gradient',
                     'line-gradient-stop-colors': [source_edge_color, target_edge_color],
                     'opacity' : edge_opacity,
-                    'control-point-distances' : np.random.randint(low=-200, high=200, size=len(G.edges))
+                    # 'control-point-distances' : np.random.randint(low=-200, high=200, size=len(G.edges))
                 }
             },
 

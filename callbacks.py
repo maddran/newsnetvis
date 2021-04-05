@@ -14,7 +14,7 @@ from summary_tab import summary_tab_content
 from summary_plots import summary_figs, get_filter_options
 
 from network_tab import network_tab_content
-from network_plots import network_plots
+from network_plots import network_data, gen_network
 
 from process_files import parse_upload, parse_preload
 
@@ -75,8 +75,6 @@ def output_preview(list_of_contents, sep_btn, nov_btn, list_of_names, list_of_da
                                 files which match the criteria described above.""", 
                                 color="danger", style={'marginTop':'10px'})
 
-
-
     return children, disable_continue, outline_continue, data_status, fpaths
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Redirect to tab~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -133,15 +131,13 @@ def on_tab_change(n_continue,
             res[1] = False
             res[2] = changed_id.split('-')[0]
             res[-1] = 'network-tab'
-    
-    print(res[2])
 
     return tuple(res)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Populate filters~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-filter_cols = ['category', 'region', 'country', 'language']
+filter_cols = ['category', 'region', 'country', 'language', 'topic']
 filter_outputs = ([Output(f'include-{col}', 'options') for col in filter_cols]
                     +[Output(f'exclude-{col}', 'options') for col in filter_cols])
 @ app.callback(
@@ -212,9 +208,6 @@ def reset_filter_values(n):
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Generate Summary Figures~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-
-                
 @app.callback(
     [Output('from-table', 'children'),
      Output('to-table', 'children')] +
@@ -251,8 +244,8 @@ def generate_summary_figs(paths, filter):
         else:
             tables = figs[0:2]
             n_sources = figs.pop(-1)
-            print(f"Num sources = {n_sources}")
-            if n_sources <= 1000:
+            # print(f"Num sources = {n_sources}")
+            if n_sources <= 2000:
                 disable_source = False
             figs = [dcc.Graph(figure=fig) for fig in figs[2:]]
         
@@ -282,18 +275,33 @@ def toggle_filters(n, is_open):
         return not is_open
     return is_open
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Produce network plot~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Produce network data~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 @app.callback(
-    Output('network-plot', 'children'),
+    Output('nodes-store', 'data'),
+    Output('edges-store', 'data'),
+    Output('sizecol-store', 'data'),
+    Output('graph-store', 'data'),
+    Output('layout-store', 'data'),
     
     Input('trigger-network', 'data'),
+    Input('reset-network-btn', 'n_clicks'),
+    Input('top-in-btn', 'n_clicks'),
+    Input('top-out-btn', 'n_clicks'),
+    Input('concentric-layout', 'n_clicks'),
+    Input('cose-layout', 'n_clicks'),
     
     State('filter-selections', 'data'),
     State('paths-store', 'data'),
+    State('nodes-store', 'data'),
     
 )
-def generate_network_figs(trigger, filters, paths):
+def generate_network_data(trigger, reset,
+                            topin, topout, 
+                            concentric, cose,
+                            filters, paths, nodes):
+    changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
+
     if not paths:
         raise PreventUpdate
     else:
@@ -306,8 +314,35 @@ def generate_network_figs(trigger, filters, paths):
         exclude = values[len(values)//2:]
 
         group_map = dict(region='region', country='country', language='lang', source=None)
-        fig = network_plots(paths, include=include, exclude=exclude,
-                            group=group_map[trigger])
+        nodes, edges, sizecol, graph, layout = (no_update,)*5
 
-        return fig
+        if ('trigger-network' in changed_id or
+                'reset-network-btn' in changed_id):
+            nodes, edges, sizecol, graph = network_data(paths, include=include, exclude=exclude,
+                                        group=group_map[trigger])
+        elif 'top-in-btn' in changed_id:
+            pass
+        elif 'top-out-btn' in changed_id:
+            pass
+        elif 'concentric-layout' in changed_id:
+            layout = 'concentric'
+        elif 'cose-layout' in changed_id:
+            layout = 'cose'
 
+        return (nodes, edges, sizecol, graph, layout)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Produce network plot~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+@app.callback(
+    Output('network-plot', 'children'),
+    
+    Input('nodes-store', 'data'),
+    Input('edges-store', 'data'),
+    Input('sizecol-store', 'data'),
+    Input('layout-store', 'data')
+)
+def generate_network_figs(nodes, edges, sizecol, layout):
+
+    print(f"Producing network with {layout} layout")
+    fig = gen_network(nodes, edges, sizecol, layout)
+
+    return fig

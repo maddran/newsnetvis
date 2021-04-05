@@ -46,7 +46,7 @@ def parse_upload(contents, filename, date):
 def parse_preload(click):
 
     edgelist_dict = {
-                'sep': "data/edgelist_202009.pkl",
+                'sep': "data/edgelist_20200901.pkl",
                 'nov' : "data/edgelist_202010.pkl"
     }
     
