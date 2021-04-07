@@ -39,15 +39,5 @@ app.layout = dbc.Container([
                           )
 
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument("--demo", dest='demo', action='store_true')
-    # parser.set_defaults(demo=False)
-
-    # args = parser.parse_args()
-
-    # if args.demo:
-    #     print('Starting Inline')
-    #     app.run_server(mode='external')
-    # else:
     app.run_server(debug=True)
         

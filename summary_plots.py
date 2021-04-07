@@ -27,8 +27,6 @@ def get_filter_options(files, selections=None):
                                 .dropna(axis=0).values)))
         options[col] = [dict(label = r, value = r) for r in res]
 
-        
-
     options['language'] = options.pop('lang')
     options['topic'] = options.pop('topic1')
     include_options = exclude_options = options
@@ -38,10 +36,17 @@ def get_filter_options(files, selections=None):
 
     return include_options, exclude_options
     
+def get_topics(t1, t2):
+    if not pd.isnull(t2):
+        return '+'.join(sorted([t1, t2]))
+    else:
+        return t1
 
 def get_full_data(files, include=None, exclude=None, from_to_flag = False):
     edge_df, sources_df = load_files(files)
     edge_df['count'] = 1
+    edge_df['topic2'] = edge_df['topic2'].replace({np.nan: None})
+    edge_df['topics'] = [get_topics(t1, t2) for t1, t2 in zip(edge_df.topic1, edge_df.topic2)]
 
     cols = ['category', 'region', 'country', 'lang']
 
@@ -60,24 +65,34 @@ def get_full_data(files, include=None, exclude=None, from_to_flag = False):
         merged = pd.merge(merged, sources_df.loc[:, cols],
                         left_on='from_index', right_index=True, how='left')
 
+    cols += ['topics']
+
     if include and any(include):
         to_include = {cols[i]:v for i, v in enumerate(include) if v and len(v)!=0}
-        
 
         for col, values in to_include.items():
-            if from_to_flag:
+            if from_to_flag and col != 'topics':
                 col = [pre+col for pre in ['from_', 'to_']]
             else:
                 col = [col]
 
             if len(to_include)==1:
                 for c in col:
-                    merged = merged[merged.loc[:, c].isin(values)]
+                    if c != 'topics':
+                        merged = merged[merged.loc[:, c].isin(values)]
+                    else:
+                        merged = merged[merged.loc[:, c].str.contains(
+                                        '|'.join(values))]
+                        
             else:
                 submerged = []
                 print(to_include)
                 for c in col:
-                    submerged.append(merged[merged.loc[:, c].isin(values)])
+                    if c != 'topics':
+                        submerged.append(merged[merged.loc[:, c].isin(values)])
+                    else:
+                        submerged.append(merged[merged.loc[:, c].str.contains(
+                                        '|'.join(values))])
 
                 merged = pd.concat(submerged).drop_duplicates()
 
@@ -85,13 +100,19 @@ def get_full_data(files, include=None, exclude=None, from_to_flag = False):
         to_exclude = {cols[i]: v for i, v in enumerate(exclude) if v and len(v)!=0}
 
         for col, values in to_exclude.items():
-            if from_to_flag:
+            if from_to_flag and col != 'topics':
                 col = [pre+col for pre in ['from_', 'to_']]
             else:
                 col = [col]
 
             for c in col:
-                merged = merged[~merged.loc[:, c].isin(values)]
+                if c != 'topics':
+                    merged = merged[~merged.loc[:, c].isin(values)]
+                else:
+                    merged = merged[~merged.loc[:, c].str.contains(
+                                        '|'.join(values))]
+    
+    print(set(merged.topics))
 
     return merged
     
@@ -184,7 +205,7 @@ def daily_articles(grouped):
             else:
                 formatted_name = name#.ljust(15)
             areas[ordered_col[name]] = (go.Scatter(name=formatted_name, x=group['parsed_date'], y=group['count'],
-                                            mode='lines', stackgroup='one',  hoveron='points'))
+                                                   mode='lines', stackgroup='one',  hoveron='points', line_shape='spline'))
        
 
         fig = go.Figure(data=areas)
