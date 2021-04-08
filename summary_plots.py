@@ -112,7 +112,7 @@ def get_full_data(files, include=None, exclude=None, from_to_flag = False):
                     merged = merged[~merged.loc[:, c].str.contains(
                                         '|'.join(values))]
     
-    print(set(merged.topics))
+    # print(set(merged.topics))
 
     return merged
     
