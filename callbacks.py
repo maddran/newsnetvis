@@ -245,7 +245,7 @@ def generate_summary_figs(paths, filter):
             tables = figs[0:2]
             n_sources = figs.pop(-1)
             # print(f"Num sources = {n_sources}")
-            if n_sources <= 2000:
+            if n_sources <= 1000:
                 disable_source = False
             figs = [dcc.Graph(figure=fig) for fig in figs[2:]]
         
@@ -285,11 +285,11 @@ def toggle_filters(n, is_open):
     Output('layout-store', 'data'),
     
     Input('trigger-network', 'data'),
-    Input('reset-network-btn', 'n_clicks'),
-    Input('top-in-btn', 'n_clicks'),
-    Input('top-out-btn', 'n_clicks'),
-    Input('concentric-layout', 'n_clicks'),
-    Input('cose-layout', 'n_clicks'),
+    Input('reset-network-btn1', 'n_clicks'),
+    Input('top-in-btn1', 'n_clicks'),
+    Input('top-out-btn1', 'n_clicks'),
+    Input('concentric-layout1', 'n_clicks'),
+    Input('cose-layout1', 'n_clicks'),
     
     State('filter-selections', 'data'),
     State('paths-store', 'data'),
@@ -317,23 +317,23 @@ def generate_network_data(trigger, reset,
         nodes, edges, sizecol, graph, layout = (no_update,)*5
 
         if ('trigger-network' in changed_id or
-                'reset-network-btn' in changed_id):
+                'reset-network-btn1' in changed_id):
             nodes, edges, sizecol, graph = network_data(paths, include=include, exclude=exclude,
                                         group=group_map[trigger])
-        elif 'top-in-btn' in changed_id:
+        elif 'top-in-btn1' in changed_id:
             pass
-        elif 'top-out-btn' in changed_id:
+        elif 'top-out-btn1' in changed_id:
             pass
-        elif 'concentric-layout' in changed_id:
+        elif 'concentric-layout1' in changed_id:
             layout = 'concentric'
-        elif 'cose-layout' in changed_id:
+        elif 'cose-layout1' in changed_id:
             layout = 'cose'
 
         return (nodes, edges, sizecol, graph, layout)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Produce network plot~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 @app.callback(
-    Output('network-plot', 'children'),
+    Output('network-plot1', 'children'),
     
     Input('nodes-store', 'data'),
     Input('edges-store', 'data'),
