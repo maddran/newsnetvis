@@ -60,9 +60,23 @@ daily_plot_tabs = dbc.Tabs(
         for col in ['region', 'language', 'country']
     ], style={'width':'100%', 'fontSize':14, 'height':'50%'})
 
+network_buttons = []
+active_status = [False, True]
+toggle_network_buttons = dbc.Row(
+                            [   dbc.Col(
+                                    dbc.Button(f"Plot Network {i+1}",
+                                        color='primary',
+                                        id=f"network{i+1}-btn",
+                                        block = True,
+                                        outline=active,
+                                        )
+                                )
+                                for i, active in enumerate(active_status)],
+                            style={'marginBottom': 5})
+network_buttons.extend([html.Hr(), toggle_network_buttons, html.Hr()])
+
 cats = ['region', 'country', 'language', 'source']
 disabled = dict(zip(cats, [False, False, False, True]))
-network_buttons = []
 for cat in cats:
     button = dbc.Button(f"Generate {cat} Network",
                         color='primary',
@@ -72,11 +86,14 @@ for cat in cats:
                         className="mb-1")
 
     network_buttons.append(html.Div(button))
+
 network_buttons.append(html.Div(id='disabled-warning'))
+
 
 summary_tab_content = html.Div(
     [
-        dcc.Store(id="filter-selections"),
+        dcc.Store(id="filter-selections1"),
+        dcc.Store(id="filter-selections2"),
         dbc.Card(
             dbc.CardBody([
                 html.Div([
@@ -86,7 +103,6 @@ summary_tab_content = html.Div(
 
                 filter_card,
 
-    
                 dbc.Row(
                     [
                         dbc.Col(

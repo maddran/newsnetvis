@@ -12,16 +12,6 @@ from summary_tab import summary_tab_content
 from network_tab import network_tab_content
 import callbacks
 
-data_tab_content = dbc.Card(
-    dbc.CardBody(
-        [
-            html.P("This is tab 2!", className="card-text"),
-            dbc.Button("Don't click here", color="danger"),
-        ]
-    ),
-    className="mt-3",
-)
-
 tabs = dbc.Tabs(
     [
         dbc.Tab(upload_tab_content, label="Select / Upload Data", tab_id="upload-tab"),
@@ -35,7 +25,7 @@ app.layout = dbc.Container([
                             tabs
                             ],
                             className="p-5", fluid=True,
-                            style={'width':'1400px'}
+                            style={'width':'auto'}
                           )
 
 if __name__ == "__main__":

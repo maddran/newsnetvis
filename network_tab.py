@@ -3,63 +3,148 @@ import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
 
-network_cards = [dbc.Col(
-                    [
-                        dbc.Spinner(
-                            dbc.Row(
-                                [
+plot_controls = [dbc.ButtonGroup(
+    [
+        dbc.Button("Reset",
+                   id=f"reset-network-btn{i}",
+                   color='primary'),
+        dbc.Button("Top 5 by out links",
+                   id=f"top-out-btn{i}",
+                   color='primary'),
+        dbc.Button("Top 5 by in links",
+                   id=f"top-in-btn{i}",
+                   color='primary'),
+        dbc.Button("Concentric Layout",
+                   id=f'concentric-layout{i}',
+                   color='primary'),
+        dbc.Button("Cose Layout",
+                   id=f'cose-layout{i}',
+                   color='primary')
+    ], vertical=True, className="ml-3"
+) for i in range(1, 3)]
 
-                                ], id=f'network-plot{i}',
-                            ),
-                        ),
-                        dbc.Row(html.H3(f"Network #{i}"), style={'position': 'absolute',
-                                                                'top': 35,
-                                                                'left': 25}),
-                        dbc.Row(
-                            dbc.ButtonGroup(
-                                [
-                                    dbc.Button("Reset",
-                                            id=f"reset-network-btn{i}",
-                                            color='primary'),
-                                    dbc.Button("Top 5 by out links",
-                                            id=f"top-out-btn{i}",
-                                            color='primary'),
-                                    dbc.Button("Top 5 by in links",
-                                            id=f"top-in-btn{i}",
-                                            color='primary'),
-                                    dbc.Button("Concentric Layout",
-                                            id=f'concentric-layout{i}',
-                                            color='primary'),
-                                    dbc.Button("Cose Layout",
-                                            id=f'cose-layout{i}',
-                                            color='primary')
-                                ], vertical=False, style={'marginLeft': 15}
-                            ),
-                            style={'position': 'absolute',
-                                    'top': 0,
-                                    'left': 10}
-                        ),
-                    ], width = 6
-                    ) 
-                    for i in range(1, 3)]
+filter_cols = ['category', 'region', 'country', 'language', 'topic']
+dropdowns = [
+    [
+        [dcc.Dropdown(options=[],
+                        multi=True,
+                        id=f'include-{col}{i}',
+                        placeholder=f'Select {col}',
+                        className="mt-2")
+         for n, col in enumerate(filter_cols)],
+        [dcc.Dropdown(options=[],
+                        multi=True,
+                        id=f'exclude-{col}{i}',
+                        placeholder=f'Select {col}',
+                        className="mt-2")
+         for n, col in enumerate(filter_cols)]
+    ]
+    for i in range(1, 3)
+]
+
+cats = ['region', 'country', 'language', 'source']
+disabled = dict(zip(cats, [False, False, False, True]))
+
+gen_plot_btns = [
+                    dbc.Col([
+                        dbc.Button(f"Generate {cat.capitalize()} Network",
+                                    color='primary',
+                                    id=f"{cat}-net-btn{i}",
+                                    block=True,
+                                    disabled=disabled[cat],
+                                    className="mb-1") 
+                        for cat in cats
+                    ]+[html.Div(id=f'disabled-warning{i}')])
+                    
+                    for i in range(1,3)
+                ]
+
+control_collapse = [
+                        dbc.Collapse([
+                            dbc.Row([
+                                dbc.Col(
+                                    [html.H6('Include (default is all):')] +
+                                    dropdowns[i-1][0]
+                                ),
+                                dbc.Col(
+                                    [html.H6('Exclude (default is none):')] +
+                                    dropdowns[i-1][1]
+                                ),
+                                gen_plot_btns[i-1]
+                            ], align='center')
+                        ], id=f'filter-collapse{i}', is_open=True)
+                        for i in range(1, 3)
+                    ]
+
+network_plots = [
+                    dbc.Col(
+                        [
+                            dcc.Store(id=f'plot-group-store{i}'),
+                            dcc.Store(id=f'nodes-store{i}'),
+                            dcc.Store(id=f'edges-store{i}'),
+                            dcc.Store(id=f'sizecol-store{i}'),
+                            dcc.Store(id=f'graph-store{i}'),
+                            dcc.Store(id=f'filter-store-{i}'),
+                            dbc.Row([html.H4(f"Network #{i}", 
+                                                className="w-20 mt-2 mr-1"),
+                                    html.Div([
+                                        dbc.Button(
+                                            "Show/Hide Controls",
+                                            id=f"collapse-filter-btn{i}",
+                                            color="primary",
+                                        ),
+                                        dbc.Button(
+                                            "Reset Filters",
+                                            id=f"reset-filters-btn{i}",
+                                            className="ml-2",
+                                            color="primary",
+                                        )], className="p-1 ml-1"),
+                                        html.Div(control_collapse[i-1], className="w-100 p-0")
+                                     ],
+                                className='p-3',
+                                style={'background': 'rgba(100,100,100,.1)',
+                                       'border-radius': '25px'}
+                                ),
+                            dbc.Row(
+                                html.Div([
+                                    dbc.Spinner(
+                                        dbc.Row(
+                                            [
+                                                html.Div("Make selections above to draw plot",
+                                                        style={'height':'200px',
+                                                                'text-align':'center',
+                                                                'padding':'100px',
+                                                                'width':'100%',
+                                                                'font-size':'20px',
+                                                                }),
+                                            ], id=f'network-plot{i}', className='w-100',
+                                        ), id=f'network-spinner{i}'
+                                    ),
+                                    html.Div(plot_controls[i-1], style={'position': 'absolute',
+                                                                        'right': '15px',
+                                                                        'top': '15px',
+                                                                        })
+                                ], className='w-100', style={'position': 'relative'})
+                            )
+                            
+                            
+                        ], className='ml-5' if i > 1 else 'ml-0'
+                    )
+                for i in range(1, 3)]
+
+
+summary_figs = dbc.Row(id='summary-figs')
+summary_collapse = dbc.Collapse(summary_figs, is_open=True)
 
 network_tab_content = html.Div(
     [
-        dcc.Store(id="network-filters"),
-        dcc.Store(id='trigger-network'),
-        dcc.Store(id='nodes-store'),
-        dcc.Store(id='edges-store'),
-        dcc.Store(id='sizecol-store'),
-        dcc.Store(id='graph-store'),
-
-        dcc.Store(data = 'concentric', id='layout-store'),
-
-        dbc.Card(
-            dbc.CardBody(
-                [dbc.Row(network_cards)]
-            )
-        )
+        dcc.Store(id="filter-store1"),
+        dcc.Store(id="filter-store2"),
+        dcc.Store(data='concentric', id='network-layout-store1'),
+        dcc.Store(data='concentric', id='network-layout-store2'),
+        dbc.Row(summary_collapse),
+        dbc.Container(dbc.Row(network_plots), fluid=True)
         
-    ], id = "network-tab-content"
+    ], id = "network-tab-content", className='p-4'
 )
 

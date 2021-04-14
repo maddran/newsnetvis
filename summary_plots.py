@@ -70,6 +70,8 @@ def get_full_data(files, include=None, exclude=None, from_to_flag = False):
     if include and any(include):
         to_include = {cols[i]:v for i, v in enumerate(include) if v and len(v)!=0}
 
+        print(include)
+
         for col, values in to_include.items():
             if from_to_flag and col != 'topics':
                 col = [pre+col for pre in ['from_', 'to_']]

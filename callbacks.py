@@ -7,6 +7,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 
 import pandas as pd
+import numpy as np
 
 from app import app
 
@@ -98,7 +99,9 @@ tab_change_outputs = (summary_tab_ouputs + network_tab_ouputs +
                 [Input(btn, 'n_clicks') for btn in network_buttons],
                 
                 State('paths-store', 'data'),
-                State('filter-selections', 'data'),
+                State('filter-selections1', 'data'),
+                State('filter-selections1', 'data'),
+
 
                 prevent_initial_call = True
              )
@@ -108,7 +111,8 @@ def on_tab_change(n_continue,
                     n_language,
                     n_source, 
                     paths, 
-                    filters):
+                    filters1,
+                    filters2):
     changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
     res = [no_update]*len(tab_change_outputs)
 
@@ -158,34 +162,45 @@ def populate_filters(paths):
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Update filter selection~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+filter_states = ([Input(f'include-{col}', 'value') for col in filter_cols] +
+                 [Input(f'exclude-{col}', 'value') for col in filter_cols])
 
-filter_states = ([State(f'include-{col}', 'value') for col in filter_cols] +
-                 [State(f'exclude-{col}', 'value') for col in filter_cols])
                     
 @app.callback(
-    Output('filter-selections', 'data'),
+    Output('filter-selections1', 'data'),
+    Output('filter-selections2', 'data'),
     [Input('apply-filters-btn', 'n_clicks'),
-                   Input('filter-reset', 'n_clicks'), 
-                   Input('trigger-network', 'data')],
-    filter_states
+            Input('filter-reset', 'n_clicks'), 
+            Input('trigger-network', 'data')],
+    filter_states,
+    State('network-toggle', 'data')
 )
 def update_filter_selection(*inputs):
     changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
     
     inputs = list(inputs)
 
-    n_apply = inputs.pop(0)
     n_reset = inputs.pop(0)
     net_trigger = inputs.pop(0)
+    net_number = inputs.pop(-1)
+    res = [no_update, no_update]
 
     if n_reset and 'filter-reset' in changed_id:
-        inputs = [None]*len(filter_states)
-        return inputs
-    elif ((n_apply and 'apply-filters-btn' in changed_id)
+        inputs = {
+            'include': dict(zip(filter_cols,[None]*len(filter_cols))),
+            'exclude': dict(zip(filter_cols,[None]*len(filter_cols))),
+        }
+    elif (any(match in changed_id for match in ['apply-filters-btn', 'include', 'exclude'])
             or net_trigger):
-        return inputs
+        inputs = {
+            'include': dict(zip(filter_cols, inputs[:len(inputs)//2])),
+            'exclude': dict(zip(filter_cols, inputs[len(inputs)//2:])),
+        }
     else:
         raise PreventUpdate
+    
+    res[net_number-1] = inputs
+    return tuple(res)
     
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Reset dropdown values~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -200,6 +215,7 @@ filter_values = ([Output(f'include-{col}', 'value') for col in filter_cols] +
     prevent_initial_call=True
 )
 def reset_filter_values(n):
+
     changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
     if n and 'filter-reset' in changed_id:
         return (None,)*len(filter_values)
@@ -217,19 +233,28 @@ def reset_filter_values(n):
      Output('disabled-warning', 'children')],
 
     Input('paths-store', 'data'),
-    Input('filter-selections', 'data'),
+    Input('filter-selections1', 'data'),
+    Input('filter-selections2', 'data'),
+
+    Input('network-toggle', 'data')
+
 )
-def generate_summary_figs(paths, filter):
+def generate_summary_figs(paths, filters1, filters2, net_toggle):
     if not paths:
         raise PreventUpdate 
     else:
-        if not filter:
-            values = [None]*8
-        else:
-            values = filter
+        if net_toggle == 1:
+            filters = filters1
+        elif net_toggle == 2:
+            filters = filters2
 
-        include = values[:len(values)//2]
-        exclude = values[len(values)//2:]  
+        if not filters:
+            include = [None]*len(filter_cols)
+            exclude = [None]*len(filter_cols)
+        else:
+            include = filters['include'].values()
+            exclude = filters['exclude'].values()
+            print(filters['include'].values())
 
         disable_source=True
 
@@ -278,10 +303,16 @@ def toggle_filters(n, is_open):
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Produce network data~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 @app.callback(
-    Output('nodes-store', 'data'),
-    Output('edges-store', 'data'),
-    Output('sizecol-store', 'data'),
-    Output('graph-store', 'data'),
+    Output('nodes-store1', 'data'),
+    Output('edges-store1', 'data'),
+    Output('sizecol-store1', 'data'),
+    Output('graph-store1', 'data'),
+
+    Output('nodes-store2', 'data'),
+    Output('edges-store2', 'data'),
+    Output('sizecol-store2', 'data'),
+    Output('graph-store2', 'data'),
+
     Output('layout-store', 'data'),
     
     Input('trigger-network', 'data'),
@@ -291,58 +322,127 @@ def toggle_filters(n, is_open):
     Input('concentric-layout1', 'n_clicks'),
     Input('cose-layout1', 'n_clicks'),
     
-    State('filter-selections', 'data'),
+    State('filter-selections1', 'data'),
+    State('filter-selections2', 'data'),
     State('paths-store', 'data'),
-    State('nodes-store', 'data'),
-    
+    State('nodes-store1', 'data'),
+    State('network-toggle', 'data')
+
 )
 def generate_network_data(trigger, reset,
                             topin, topout, 
                             concentric, cose,
-                            filters, paths, nodes):
+                            filters1, filters2, paths, nodes, net_toggle):
     changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
 
     if not paths:
         raise PreventUpdate
     else:
-        if not filters:
-            values = [None]*8
-        else:
-            values = filters
+        if net_toggle == 1:
+            filters = filters1
+            update_index = 0
+        elif net_toggle == 2:
+            filters = filters2
+            update_index = 4
 
-        include = values[:len(values)//2]
-        exclude = values[len(values)//2:]
+        if not filters:
+            include = [None]*len(filter_cols)
+            exclude = [None]*len(filter_cols)
+        else:
+            include = filters['include'].values()
+            exclude = filters['exclude'].values()
 
         group_map = dict(region='region', country='country', language='lang', source=None)
-        nodes, edges, sizecol, graph, layout = (no_update,)*5
+        net_data = [no_update]*9
 
         if ('trigger-network' in changed_id or
                 'reset-network-btn1' in changed_id):
-            nodes, edges, sizecol, graph = network_data(paths, include=include, exclude=exclude,
+            net_data[update_index:update_index+4] = network_data(paths, include=include, exclude=exclude,
                                         group=group_map[trigger])
         elif 'top-in-btn1' in changed_id:
             pass
         elif 'top-out-btn1' in changed_id:
             pass
         elif 'concentric-layout1' in changed_id:
-            layout = 'concentric'
+            net_data[-1] = 'concentric'
         elif 'cose-layout1' in changed_id:
-            layout = 'cose'
+            net_data[-1] = 'cose'
 
-        return (nodes, edges, sizecol, graph, layout)
+        return tuple(net_data)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Produce network plot~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 @app.callback(
     Output('network-plot1', 'children'),
+    Output('network-plot2', 'children'),
     
-    Input('nodes-store', 'data'),
-    Input('edges-store', 'data'),
-    Input('sizecol-store', 'data'),
-    Input('layout-store', 'data')
+    Input('nodes-store1', 'data'),
+    Input('edges-store1', 'data'),
+    Input('sizecol-store1', 'data'),
+
+    Input('nodes-store2', 'data'),
+    Input('edges-store2', 'data'),
+    Input('sizecol-store2', 'data'),
+
+    Input('layout-store', 'data'),
+
+    State('network-toggle', 'data')
 )
-def generate_network_figs(nodes, edges, sizecol, layout):
+def generate_network_figs(*inputs):
 
-    print(f"Producing network with {layout} layout")
-    fig = gen_network(nodes, edges, sizecol, layout)
+    inputs = list(inputs)
+    net_toggle = inputs.pop(-1)
+    layout = inputs.pop(-1)
 
+    res = [no_update]*2
+    res[net_toggle-1] = get_fig(net_toggle, inputs, res, layout)
+
+    changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
+
+    if 'layout-store' in changed_id:
+        print(f"Updating networks with {layout} layout")
+        net_toggle = 1 if net_toggle == 2 else 2
+        res[net_toggle-1] = get_fig(net_toggle, inputs, res, layout)
+
+    return tuple(res)
+
+def get_fig(net_toggle, inputs, res, layout):
+    if net_toggle == 1:
+        input_index = 0
+    elif net_toggle == 2:
+        input_index = 3
+
+    nodes, edges, sizecol = inputs[input_index:input_index+3]
+    if all([nodes, edges]):
+        fig = gen_network(nodes, edges, sizecol, layout)
+    else:
+        fig = None
     return fig
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Select network plot~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+@app.callback(
+    Output('network-toggle', 'data'),
+    Output('network1-btn', 'outline'),
+    Output('network2-btn', 'outline'),
+
+    Input('network1-btn', 'n_clicks'),
+    Input('network2-btn', 'n_clicks'),
+)
+
+def toggle_plot(btn1, btn2):
+    changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
+    plot_num = no_update
+    active1 = active2 = no_update
+
+    if 'network1-btn' in changed_id:
+        plot_num = 1
+        active1 = False
+        active2 = True
+    elif 'network2-btn' in changed_id:
+        plot_num = 2
+        active1 = True
+        active2 = False
+
+    return (plot_num, active1, active2)
+

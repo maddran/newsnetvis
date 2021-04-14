@@ -5,7 +5,7 @@ import dash_html_components as html
 
 
 upload_div = html.Div([
-    html.H3("Or, upload data files below:", className="upload-text"),
+    html.H5("Or, upload data files below:", className="upload-text"),
     html.Ul([
         html.Li("Source List: CSV file containing metadata of sources used to produce dataset (with latitude and longitude)"),
         html.Li(
@@ -35,7 +35,7 @@ upload_div = html.Div([
 
 preload_div = html.Div(
     [
-        html.H3("Select one of the preloaded datasets below:", className="preload-text"),
+        html.H5("Select one of the preloaded datasets below:", id="preload-text"),
         dbc.Button("Sep 2020", outline=False, color="primary", id='sep-btn', 
                    className="mr-1", n_clicks=0),
         dbc.Button("Nov 2020", outline=False, color="primary", id='nov-btn', 
@@ -44,36 +44,27 @@ preload_div = html.Div(
                    disabled=True, className="mr-1", n_clicks=0)
     ])
 
-upload_tab_content = html.Div(
-    [
-        dcc.Store(id="paths-store"),
-        dbc.Card(
-            dbc.CardBody(
-                dbc.Row(
+upload_tab_content = dbc.Row(
+            [
+                dbc.Col(
                     [
-                        dbc.Col(
-                            [
-                                preload_div,
-                                html.Hr(),
-                                upload_div,
-                                html.Hr(),
-                                dbc.Button("Continue", color="primary", id="data-continue-btn",
-                                            block=True, outline = True, disabled=True),
-                                html.Div(id='upload-check')
-                            ], id="select_col",
-                        ),
-                        dbc.Col(
-                            dbc.Spinner(
-                                [
-                                    html.Div(id='output-files-upload',
-                                             style={"height": "300px"}),
-                                ]
-                            ), id="table_col", width=6 
-                        )
-                    ], style={"height": "100%"}
+                        preload_div,
+                        html.Hr(),
+                        upload_div,
+                        html.Hr(),
+                        dbc.Button("Continue", color="primary", id="data-continue-btn",
+                                    block=True, outline = True, disabled=True, href='/netplots'),
+                        html.Div(id='upload-check')
+                    ], id="select_col", width = 4
+                ),
+                dbc.Col(
+                    dbc.Spinner(
+                        [
+                            html.Div(id='output-files-upload',
+                                        style={"height": "500px"},
+                                        className="p-3"),
+                        ]
+                    ), id="table_col", width=5, style={"background-color": "rgba(10,30,100,0.1)"}
                 )
-
-            ), style={"height": "100vh"}
+            ], className = "vh-100 p-4", 
         )
-        
-    ])

@@ -67,7 +67,7 @@ def df_table(df, filename):
             data=df.head(100).to_dict('records'),
             columns=[{'name': i, 'id': i} for i in df.columns],
             style_table={
-                'height' : '300px',
+                'height' : '200px',
                 'overflowY': 'auto',
                 'overflowX': 'auto',
                 'maxWidth': '100%'
