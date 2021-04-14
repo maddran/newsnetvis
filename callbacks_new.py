@@ -8,7 +8,7 @@ from dash.dependencies import Input, Output, State
 
 import itertools
 
-from index_new import app
+from app import app
 from process_files import parse_upload, parse_preload
 from upload_tab import upload_tab_content
 from network_tab import network_tab_content, filter_cols, cats
