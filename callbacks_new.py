@@ -42,7 +42,7 @@ def display_page(pathname, layouts, current_layout):
     data_active = no_update
     netplots_active = no_update
 
-    if pathname == '/':
+    if any(pathname == path for path in ['/', '', '//']):
         data_active, netplots_active = [True, False]
         if layouts['data'] != None:
             layouts['plots'] = current_layout
