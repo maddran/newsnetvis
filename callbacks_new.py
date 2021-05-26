@@ -7,13 +7,14 @@ from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
 
 import itertools
+import re
 
 from app import app
 from process_files import parse_upload, parse_preload
 from upload_tab import upload_tab_content
-from network_tab import network_tab_content, filter_cols, cats
+from network_tab import network_tab_content, filter_cols, cats, count_params
 from network_plots import network_data, gen_network
-from summary_plots import summary_figs, get_filter_options
+from summary_plots import summary_figs, get_filter_options, get_data_counts
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Toggle navbar for small screens~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 @app.callback(
@@ -151,6 +152,7 @@ def populate_filters(paths):
         filter_options = [[fo[col] for col in filter_cols]
                           for fo in filter_options]
         res = tuple([item for sublist in filter_options for item in sublist]*2)
+    
 
     return res
 
@@ -209,21 +211,28 @@ def toggle_filter_collapse(n1, n2, is_open1, is_open2):
 filter_inputs = [
                     [Input(f'include-{col}{i}', 'value') for col in filter_cols]
                   + [Input(f'exclude-{col}{i}', 'value') for col in filter_cols]
+                  + [Input(f'include-{col}{i}', 'options') for col in filter_cols]
+                  + [Input(f'exclude-{col}{i}', 'options') for col in filter_cols]
                   for i in range(1,3)
                  ]
+
+count_store = [Output(f'counts-store-{i}', 'data')for i in range(1, 3)]
 
 filter_inputs = list(itertools.chain.from_iterable(filter_inputs))
 
 @app.callback(
-    Output('filter-store1', 'data'),
-    Output('filter-store2', 'data'),
+    [Output('filter-store1', 'data'),
+    Output('filter-store2', 'data')]+count_store,
 
-    filter_inputs
+    filter_inputs,
 
+    State('paths-store', 'data')
 )
 def update_filter_selection(*inputs):
     changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
+    
     inputs = list(inputs)
+    paths = inputs.pop(-1)
 
     if changed_id and len(changed_id)>1:
         net_number = int(changed_id.split('.')[0][-1])
@@ -232,29 +241,90 @@ def update_filter_selection(*inputs):
 
     if net_number == 1:
         inputs = inputs[:len(inputs)//2]
+        inputs = inputs[:len(inputs)//2]
     elif net_number == 2:
         inputs = inputs[len(inputs)//2:]
+        inputs = inputs[:len(inputs)//2]
     
-    # n_reset = inputs.pop(-1)
-    res = [no_update, no_update]
+    filter_res = [no_update, no_update]
+    counts_res = [no_update, no_update]
 
-    # if n_reset and 'reset-filters' in changed_id:
-    #     filter_state = {
-    #         'include': dict(zip(filter_cols, [None]*len(filter_cols))),
-    #         'exclude': dict(zip(filter_cols, [None]*len(filter_cols))),
-    #     }
-    if (any(match in changed_id for match in ['include', 'exclude'])):
+    filter_state = None
+    include = None
+    exclude = None
+
+    if 'value' in changed_id:
         filter_state = {
             'include': dict(zip(filter_cols, inputs[:len(inputs)//2])),
             'exclude': dict(zip(filter_cols, inputs[len(inputs)//2:])),
         }
+        filter_res[net_number-1] = filter_state
+
+        include = (filter_state['include'].values() if (filter_state and any(
+                        filter_state['include'].values())) else None)
+        exclude = (filter_state['exclude'].values() if (filter_state and any(
+            filter_state['exclude'].values())) else None)
+        
+    if any([include, exclude]):    
+        counts_res[net_number-1] = get_data_counts(paths, include, exclude)
     else:
-        raise PreventUpdate
-
-    res[net_number-1] = filter_state
-    return tuple(res)
+        counts_res = [get_data_counts(paths, include, exclude)]*2
     
+    res = filter_res+counts_res
+    
+    return tuple(res)
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Update counts~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+count_outputs = [
+    [Output(f"{param}-count{i}", "children")for param in count_params]
+    for i in range(1, 3)
+]
+
+source_button_out = [[Output(f'source-net-btn{i}', 'disabled'),
+                      Output(f'disabled-warning{i}', 'children')]
+                     for i in range(1, 3)]
+
+count_inputs = [Input(f'counts-store-{i}', 'data')for i in range(1, 3)]
+count_LU = ['article', 'country', 'lang', 'sources']
+
+for i in range(0,2):
+    @app.callback(
+        count_outputs[i]+source_button_out[i],
+        count_inputs[i],
+    )
+    def update_counts(*inputs):
+
+        inputs = list(inputs)
+
+        counts = inputs[0]
+
+        changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
+
+        if changed_id and len(changed_id) > 1:
+            len_out = len(count_outputs[0]) + len(source_button_out[0])
+            res = [no_update]*len_out
+            out_ = [counts[param] for param in count_LU]
+            res[0:4] = [format_num(o) for o in out_]
+            if res[3] > 1e3:
+                res[4:] = [True, dbc.Alert("N.B. 'Generate Source Network' has been disabled becasue "
+                                                    "the graph would be too large to plot stably. "
+                                                    "Please consider filtering the dataset.",
+                                                    color="dark")]
+            else:
+                res[4:] = [False, '']
+        else:
+            raise PreventUpdate
+
+        return tuple(res)
+
+def format_num(num):
+    if num >= 1e6:
+        return f"{round(num/1e6, 2)}M"
+    elif num >= 1e4:
+        return f"{round(num/1e4, 2)}k"
+    else:
+        return num
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Produce Network Data~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 plot_control_inputs = [
@@ -281,8 +351,6 @@ network_data_ouputs = list(itertools.chain.from_iterable(network_data_ouputs))
 network_states = ([State(f'plot-group-store{i}', 'data') for i in range(1, 3)]+
                  [State(f'network-layout-store{i}', 'data') for i in range(1, 3)]+
                  [State('paths-store', 'data')])
-# network_states = list(itertools.chain.from_iterable(network_states))
-
 
 @app.callback(
     network_data_ouputs,
@@ -315,6 +383,7 @@ def generate_network_data(*inputs):
         inputs = inputs[len(inputs)//2:]
 
     filters = inputs.pop(-1)
+
     if not filters:
         include = [None]*len(filter_cols)
         exclude = [None]*len(filter_cols)
@@ -354,40 +423,75 @@ def generate_network_data(*inputs):
 
     return tuple(res)
 
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Produce network plot~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 network_plot_inputs = [[Input(f'nodes-store{i}', 'data'),
                         Input(f'edges-store{i}', 'data'),
                         Input(f'sizecol-store{i}', 'data'),
                         Input(f'network-layout-store{i}', 'data'),
                         Input(f'graph-store{i}', 'data')]
                        for i in range(1, 3)]
-network_plot_inputs = list(itertools.chain.from_iterable(network_plot_inputs))
+# network_plot_inputs = list(itertools.chain.from_iterable(network_plot_inputs))
 
-@app.callback(
-    Output('network-plot1','children'),
-    Output('network-plot2','children'),
+for i in range(0,2):
+    @app.callback(
+        Output(f'network-plot{i+1}','children'),
+        Output(f'plot-desc-{i+1}', 'children'),
 
-    network_plot_inputs,
+        network_plot_inputs[i],
+        State(f'plot-group-store{i+1}', 'data'),
+        State(f'filter-store{i+1}', 'data')
+    )
+    def generate_network_figs(*inputs):
 
-    # network_states,
-)
-def generate_network_figs(*inputs):
+        inputs = list(inputs)
 
-    inputs = list(inputs)
+        filters = inputs.pop(-1)
+        if not filters:
+            include = "all"
+            exclude = "none"
+        else:
+            include = filters['include'].values()
+            include = list(itertools.chain.from_iterable([l for l in include if l]))
+            include = ', '.join(str.capitalize(s) for s in include if s)
 
-    changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
+            exclude = filters['exclude'].values()
+            exclude = list(itertools.chain.from_iterable([l for l in exclude if l]))
+            exclude = ', '.join(str.capitalize(s) for s in exclude if s)
 
-    if changed_id and len(changed_id) > 1:
-        net_number = int(changed_id.split('.')[0][-1])
-    else:
-        raise PreventUpdate
+        if len(include) == 0:
+            include = "all"
+        if len(exclude) == 0:
+            exclude = "none"
 
-    if net_number == 1:
-        inputs = inputs[:len(inputs)//2]
-    elif net_number == 2:
-        inputs = inputs[len(inputs)//2:]
+        plot_group = inputs.pop(-1)
+        layout = inputs[3]
 
-    res = [no_update]*2
-    res[net_number-1] = gen_network(*inputs[:-1])
-    return res
+        changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
+
+        if changed_id and len(changed_id) > 1:
+            print(f"Num nodes = {len(inputs[0])}")
+            if len(inputs[0]) >= 1e3:
+                res = [html.H5("Too many nodes in current selection!"
+                                    "Please consider either filtering the dataset or"
+                                    " selecting a different level of aggregation.",
+                                style={'height': '200px',
+                                       'text-align': 'center',
+                                       'padding': '100px',
+                                       'width': '100%',
+                                       'color':'red',
+                                       'font-size': '20px',
+                                       }), None]
+            else:
+                desc = (f"Current Plot : {str.capitalize(plot_group)} network // "
+                        f"{str.capitalize(layout)} layout // Includes {include} // "
+                        f"Excludes {exclude}"
+                        )
+                res = [gen_network(*inputs[:-1]), desc]
+            return res
+        else:
+            raise PreventUpdate
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Update plot layout~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# top_by_degree_inputs = [Input(id = f'')]

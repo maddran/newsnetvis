@@ -2,6 +2,8 @@ import networkx as nx
 from networkx.readwrite import json_graph
 import matplotlib.pyplot as plt 
 import dash_cytoscape as cyto
+import dash_bootstrap_components as dbc
+import dash_html_components as html
 
 import pandas as pd
 import numpy as np
@@ -22,13 +24,27 @@ def node_size_col(G):
     total_degree = sum_dicts(dict(G.degree(weight='count')), selfloops, 1)
     net_degree = sum_dicts(in_degree, out_degree, 1)
 
-    max_size = max(total_degree.values())
-    min_size = min(total_degree.values())
+    if total_degree:
+        max_size = max(total_degree.values())
+        min_size = min(total_degree.values())
 
-    max_col = max(net_degree.values())
-    min_col = min(net_degree.values())
+        max_col = max(net_degree.values())
+        min_col = min(net_degree.values())
+    
+    else:
+        max_size = min_size = None
+        max_col = min_col = None
 
     return total_degree, net_degree, max_size, min_size, max_col, min_col
+
+def top_degree(G, in_out):
+    if in_out == 'in':
+        deg = dict(G.in_degree(weight='count'))
+    elif in_out == 'out':
+        deg = dict(G.out_degree(weight='count'))
+    
+    top = sorted(A, key=A.get, reverse=True)[:5]
+    print(f"Top 5 by {in_out} = {top}")
 
 def network_data(files, include=None, exclude=None, group=None):
 
@@ -52,7 +68,6 @@ def network_data(files, include=None, exclude=None, group=None):
                     )
                 for n in G.nodes]
 
-
     else:
         cols = sorted([col for col in data.columns if group in col])
 
@@ -71,8 +86,6 @@ def network_data(files, include=None, exclude=None, group=None):
                     )
                 for n in G.nodes]
 
-    
-
     edges = [dict(
                 data=dict(source=str(e[0]), target=str(e[1]), 
                 label='', count=e[2]['count'])
@@ -87,20 +100,26 @@ def network_data(files, include=None, exclude=None, group=None):
 
 def gen_network(nodes, edges, sizecol, layout = 'concentric'):
     elements = nodes + edges
-    network = cyto.Cytoscape(
-                id='network-layout',
-                elements=elements,
-                style={'width': '100%', 'height': '800px'},
-                layout={
-                    'name': layout,
-                    'fit': True,
-                    'animate': False,
-                    'gravity': 10,
-                    'nodeOverlap': 5e5,
-                    'nodeRepulsion': 1e6,
-                },
-                stylesheet=gen_stylesheet(sizecol)
-            )
+    if None in sizecol.values():
+        print(sizecol)
+        network = html.Div(dbc.Alert("The filter selection made returned a network with no links. "
+                            "Please verify your filters or the chosen dataset!",
+                            color="danger"), style={'padding':'80px', 'text-align':'center'})
+    else:
+        network = cyto.Cytoscape(
+                    id='network-layout',
+                    elements=elements,
+                    style={'width': '100%', 'height': '800px'},
+                    layout={
+                        'name': layout,
+                        'fit': True,
+                        'animate': False,
+                        'gravity': 10,
+                        'nodeOverlap': 5e5,
+                        'nodeRepulsion': 1e6,
+                    },
+                    stylesheet=gen_stylesheet(sizecol)
+                )
 
     return network
 

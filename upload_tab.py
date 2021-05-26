@@ -39,7 +39,7 @@ preload_div = html.Div(
         dbc.Button("Sep 2020", outline=False, color="primary", id='sep-btn', 
                    className="mr-1", n_clicks=0),
         dbc.Button("Nov 2020", outline=False, color="primary", id='nov-btn', 
-                   disabled=True, className="mr-1", n_clicks=0),
+                   disabled=False, className="mr-1", n_clicks=0),
         dbc.Button("Jan 2021", outline=False, color="primary", id='jan-btn',
                    disabled=True, className="mr-1", n_clicks=0)
     ])

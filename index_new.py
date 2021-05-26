@@ -49,7 +49,9 @@ url_nav_content = dbc.Container(
         navbar,
         html.Div(id="page-content"),
         dcc.Store(id="paths-store"),
-        dcc.Store(data={"data":None, "plots":None}, id="layout-store"),
+        dcc.Store(id="data-store"),
+        dcc.Store(data={"data": None, "plots": None}, id="layout-store"),
+
     ],
     className="p-0",
     fluid=True

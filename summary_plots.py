@@ -34,8 +34,25 @@ def get_filter_options(files, selections=None):
     if selections:
         pass
 
-    return include_options, exclude_options
+    return (include_options, exclude_options)
+
+def get_data_counts(files, include = None, exclude = None):
+    summary = get_full_data(files, include, exclude)
+
+    counts = dict(article=len(summary))
+
+    cols = ['category', 'region', 'country', 'lang']
+    for col in cols:
+        if col in summary.columns:
+            counts[col] = len(set(summary.loc[:,col]))
     
+    counts['sources'] = len(set.union(
+                                set(summary.loc[:, 'from_index']),
+                                set(summary.loc[:, 'to_index'])
+                            ))
+
+    return counts
+
 def get_topics(t1, t2):
     if not pd.isnull(t2):
         return '+'.join(sorted([t1, t2]))
@@ -70,8 +87,6 @@ def get_full_data(files, include=None, exclude=None, from_to_flag = False):
     if include and any(include):
         to_include = {cols[i]:v for i, v in enumerate(include) if v and len(v)!=0}
 
-        print(include)
-
         for col, values in to_include.items():
             if from_to_flag and col != 'topics':
                 col = [pre+col for pre in ['from_', 'to_']]
@@ -88,7 +103,6 @@ def get_full_data(files, include=None, exclude=None, from_to_flag = False):
                         
             else:
                 submerged = []
-                print(to_include)
                 for c in col:
                     if c != 'topics':
                         submerged.append(merged[merged.loc[:, c].isin(values)])
